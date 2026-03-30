@@ -8,10 +8,14 @@ namespace Lab4.Controllers;
 public class SubscribeController : Controller
 {
     private readonly ICsvStorageService _csvStorageService;
+    private readonly IEmailNotificationService _emailNotificationService;
 
-    public SubscribeController(ICsvStorageService csvStorageService)
+    public SubscribeController(
+        ICsvStorageService csvStorageService,
+        IEmailNotificationService emailNotificationService)
     {
         _csvStorageService = csvStorageService;
+        _emailNotificationService = emailNotificationService;
     }
 
     [HttpPost]
@@ -24,8 +28,17 @@ public class SubscribeController : Controller
             return RedirectBack();
         }
 
-        await _csvStorageService.SaveSubscriptionAsync(data.Email);
-        TempData["SubscribeSuccess"] = "1";
+        try
+        {
+            await _csvStorageService.SaveSubscriptionAsync(data.Email);
+            await _emailNotificationService.SendSubscriptionAsync(data.Email);
+            TempData["SubscribeSuccess"] = "1";
+        }
+        catch (Exception ex)
+        {
+            TempData["SubscribeError"] = $"Subscription saved but notification email failed: {ex.Message}";
+        }
+
         return RedirectBack();
     }
 

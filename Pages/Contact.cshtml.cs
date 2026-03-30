@@ -8,10 +8,14 @@ namespace Lab4.Pages;
 public class ContactModel : PageModel
 {
     private readonly ICsvStorageService _csvStorageService;
+    private readonly IEmailNotificationService _emailNotificationService;
 
-    public ContactModel(ICsvStorageService csvStorageService)
+    public ContactModel(
+        ICsvStorageService csvStorageService,
+        IEmailNotificationService emailNotificationService)
     {
         _csvStorageService = csvStorageService;
+        _emailNotificationService = emailNotificationService;
     }
 
     [BindProperty]
@@ -31,6 +35,7 @@ public class ContactModel : PageModel
         }
 
         await _csvStorageService.SaveContactAsync(Input);
+        await _emailNotificationService.SendContactAsync(Input);
         IsSubmitted = true;
         Input = new ContactRequest();
         ModelState.Clear();

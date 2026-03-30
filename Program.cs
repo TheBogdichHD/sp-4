@@ -1,11 +1,27 @@
 using System.Collections.Concurrent;
 using Lab4.Services;
 
+LoadDotEnv(Path.Combine(Directory.GetCurrentDirectory(), ".env"));
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddRazorPages();
 builder.Services.AddSingleton<ICsvStorageService, CsvStorageService>();
+builder.Services.Configure<GmailSmtpOptions>(options =>
+{
+    options.Host = builder.Configuration["GmailSmtp:Host"] ?? "smtp.gmail.com";
+
+    var portRaw = Environment.GetEnvironmentVariable("GMAIL_SMTP_PORT")
+                  ?? builder.Configuration["GmailSmtp:Port"];
+    options.Port = int.TryParse(portRaw, out var port) ? port : 587;
+
+    options.Username = Environment.GetEnvironmentVariable("GMAIL_SMTP_USERNAME") ?? string.Empty;
+    options.AppPassword = Environment.GetEnvironmentVariable("GMAIL_SMTP_APP_PASSWORD") ?? string.Empty;
+    options.FromEmail = Environment.GetEnvironmentVariable("GMAIL_SMTP_FROM_EMAIL") ?? string.Empty;
+    options.ToEmail = Environment.GetEnvironmentVariable("GMAIL_SMTP_TO_EMAIL") ?? string.Empty;
+});
+builder.Services.AddTransient<IEmailNotificationService, GmailEmailNotificationService>();
 
 var app = builder.Build();
 
@@ -69,3 +85,38 @@ app.MapGet("/tos.html", (HttpContext context) =>
 });
 
 app.Run();
+
+static void LoadDotEnv(string path)
+{
+    if (!File.Exists(path))
+    {
+        return;
+    }
+
+    foreach (var rawLine in File.ReadAllLines(path))
+    {
+        var line = rawLine.Trim();
+        if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
+        {
+            continue;
+        }
+
+        var separatorIndex = line.IndexOf('=');
+        if (separatorIndex <= 0)
+        {
+            continue;
+        }
+
+        var key = line[..separatorIndex].Trim();
+        var value = line[(separatorIndex + 1)..].Trim();
+
+        if (value.Length >= 2 &&
+            ((value.StartsWith('"') && value.EndsWith('"')) ||
+             (value.StartsWith('\'') && value.EndsWith('\''))))
+        {
+            value = value[1..^1];
+        }
+
+        Environment.SetEnvironmentVariable(key, value);
+    }
+}
